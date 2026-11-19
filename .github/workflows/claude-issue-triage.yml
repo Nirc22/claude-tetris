@@ -37,10 +37,12 @@ jobs:
 
       - name: Analizar issue con Claude
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          claude_args: '--allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*)"'
+          claude_args: '--allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*),Bash(gh label create:*)"'
           prompt: |
             REPO: ${{ github.repository }}
             ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -73,3 +75,25 @@ jobs:
                Pasos concretos para implementarla.
                ### Criterios de aceptación
                ### Preguntas abiertas / información faltante
+
+            IMPORTANTE: los labels DEBEN quedar aplicados en el issue (paso 3) ANTES de publicar el comentario. Después de `gh issue edit`, confirma con `gh issue view ISSUE_NUMBER --repo REPO --json labels` que quedaron asignados.
+
+      - name: Verificar labels aplicados al issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          labels=$(gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name')
+          echo "Labels actuales:"; echo "$labels"
+
+          # Fallback: si Claude no asignó prioridad o tipo, se aplica un valor por defecto
+          if ! echo "$labels" | grep -q '^priority: '; then
+            gh issue edit "$ISSUE_NUMBER" --add-label "priority: medium"
+          fi
+          if ! echo "$labels" | grep -qE '^(bug|enhancement|documentation|question|accessibility|invalid|duplicate)$'; then
+            gh issue edit "$ISSUE_NUMBER" --add-label "question"
+          fi
+          if ! echo "$labels" | grep -q '^area: '; then
+            echo "::warning::El issue #$ISSUE_NUMBER no tiene label de área."
+          fi
