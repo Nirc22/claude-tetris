@@ -55,6 +55,22 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const energyFill = document.getElementById('energy-fill');
+const energyHint = document.getElementById('energy-hint');
+const queueCanvas = document.getElementById('queue-canvas');
+const queueCtx = queueCanvas.getContext('2d');
+const holdCanvas = document.getElementById('hold-canvas');
+const holdCtx = holdCanvas.getContext('2d');
+const holdSection = document.getElementById('hold-section');
+const holdLabel = document.getElementById('hold-label');
+const effectsSection = document.getElementById('effects');
+const effectsList = document.getElementById('effects-list');
+const abilityMenu = document.getElementById('ability-menu');
+
+const ENERGY_MAX = 10;
+const SLOW_MS = 10000;
+const SLOW_FACTOR = 2;
+const EFFECT_PIECES = 10;
 
 let gridColor = '#22222e';
 
@@ -64,10 +80,13 @@ function applyTheme(theme) {
   themeToggle.setAttribute('aria-checked', String(isLight));
   gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || gridColor;
   // El rAF está cancelado en pausa/game over: redibujar manualmente
-  if (current && next) { draw(); drawNext(); }
+  if (current && queue.length) { draw(); drawNext(); drawHold(); }
 }
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, current, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let queue = [];
+let energy = 0, choosing = false;
+let previewLeft = 0, slowLeft = 0, holdLeft = 0, held = null, holdUsed = false, undoSnapshot = null;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -143,7 +162,8 @@ function clearLines() {
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     // Recompensa tras un Tetris: la siguiente pieza es un 1x1
-    if (cleared >= 4) next = makePiece(SINGLE_TYPE);
+    if (cleared >= 4) queue[0] = makePiece(SINGLE_TYPE);
+    energy = Math.min(ENERGY_MAX, energy + cleared + (cleared >= 4 ? 1 : 0));
     updateHUD();
   }
 }
@@ -172,24 +192,60 @@ function softDrop() {
 }
 
 function lockPiece() {
+  undoSnapshot = {
+    board: board.map(row => [...row]),
+    type: current.type,
+    queue: [...queue],
+    score, lines, level, dropInterval,
+    previewLeft, holdLeft, held, holdUsed,
+  };
   merge();
   clearLines();
   spawn();
 }
 
+function fillQueue() {
+  while (queue.length < 5) queue.push(randomPiece());
+}
+
 function spawn() {
-  current = next;
-  next = randomPiece();
+  current = queue.shift();
+  fillQueue();
+  holdUsed = false;
+  if (previewLeft > 0) previewLeft--;
+  if (holdLeft > 0) {
+    holdLeft--;
+    if (holdLeft === 0) held = null;
+  }
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
   drawNext();
+  drawHold();
+  updateHUD();
+}
+
+function updateEffects() {
+  const items = [];
+  if (slowLeft > 0) items.push(`Lento: ${Math.ceil(slowLeft / 1000)}s`);
+  if (previewLeft > 0) items.push(`Vista 5: ${previewLeft} piezas`);
+  if (holdLeft > 0) items.push(`Hold: ${holdLeft} piezas`);
+  effectsList.textContent = items.join('\n');
+  effectsSection.classList.toggle('hidden', items.length === 0);
 }
 
 function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  const full = energy >= ENERGY_MAX;
+  energyFill.style.width = `${(energy / ENERGY_MAX) * 100}%`;
+  energyFill.classList.toggle('full', full);
+  energyHint.textContent = full ? 'Pulsa E' : `${energy}/${ENERGY_MAX}`;
+  queueCanvas.classList.toggle('hidden', previewLeft <= 0);
+  holdSection.classList.toggle('hidden', holdLeft <= 0);
+  holdLabel.textContent = `HOLD (${holdLeft})`;
+  updateEffects();
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -246,12 +302,103 @@ function draw() {
 function drawNext() {
   const NB = 30;
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  const shape = next.shape;
+  drawShapeCentered(nextCtx, queue[0].shape, 0, NB);
+
+  queueCtx.clearRect(0, 0, queueCanvas.width, queueCanvas.height);
+  if (previewLeft > 0)
+    for (let i = 1; i <= 4; i++)
+      drawShapeCentered(queueCtx, queue[i].shape, (i - 1) * 4, 15);
+}
+
+// Dibuja una forma centrada en una cuadrícula de 4x4 celdas, desplazada rowOffset filas
+function drawShapeCentered(context, shape, rowOffset, size) {
   const offX = Math.floor((4 - shape[0].length) / 2);
-  const offY = Math.floor((4 - shape.length) / 2);
+  const offY = rowOffset + Math.floor((4 - shape.length) / 2);
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
-      drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
+      drawBlock(context, offX + c, offY + r, shape[r][c], size);
+}
+
+function drawHold() {
+  holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
+  if (held) drawShapeCentered(holdCtx, PIECES[held], 0, 30);
+}
+
+function holdSwap() {
+  if (holdLeft <= 0 || holdUsed) return;
+  const prevCurrent = current;
+  const prevHeld = held;
+  const incoming = prevHeld ? makePiece(prevHeld) : queue[0];
+  if (collide(incoming.shape, incoming.x, incoming.y)) return;
+  if (!prevHeld) { queue.shift(); fillQueue(); }
+  held = prevCurrent.type;
+  current = incoming;
+  holdUsed = true;
+  drawNext();
+  drawHold();
+}
+
+function openAbilityMenu() {
+  if (paused || gameOver || choosing || energy < ENERGY_MAX) return;
+  choosing = true;
+  cancelAnimationFrame(animId);
+  overlayTitle.textContent = 'HABILIDAD';
+  overlayScore.textContent = '';
+  restartBtn.classList.add('hidden');
+  abilityMenu.querySelector('[data-ability="4"]').disabled = !undoSnapshot;
+  abilityMenu.classList.remove('hidden');
+  overlay.classList.remove('hidden');
+}
+
+function closeAbilityMenu() {
+  if (!choosing) return;
+  choosing = false;
+  if (abilityMenu.contains(document.activeElement)) document.activeElement.blur();
+  abilityMenu.classList.add('hidden');
+  restartBtn.classList.remove('hidden');
+  overlay.classList.add('hidden');
+  lastTime = performance.now();
+  animId = requestAnimationFrame(loop);
+}
+
+function useAbility(n) {
+  if (!choosing) return;
+  switch (n) {
+    case 1:
+      previewLeft = EFFECT_PIECES;
+      break;
+    case 2: {
+      const types = [1, 2, 3, 4, 5, 6, 7].filter(t => t !== current.type);
+      for (let i = types.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [types[i], types[j]] = [types[j], types[i]];
+      }
+      const piece = types.map(makePiece).find(p => !collide(p.shape, p.x, p.y));
+      if (piece) current = piece;
+      break;
+    }
+    case 3:
+      slowLeft = SLOW_MS;
+      break;
+    case 4:
+      if (!undoSnapshot) return;
+      ({ score, lines, level, dropInterval, previewLeft, holdLeft, held, holdUsed } = undoSnapshot);
+      board = undoSnapshot.board;
+      queue = undoSnapshot.queue;
+      current = makePiece(undoSnapshot.type);
+      undoSnapshot = null;
+      break;
+    case 5:
+      holdLeft = EFFECT_PIECES;
+      break;
+    default:
+      return;
+  }
+  energy = 0;
+  updateHUD();
+  drawNext();
+  drawHold();
+  closeAbilityMenu();
 }
 
 function endGame() {
@@ -263,7 +410,7 @@ function endGame() {
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (gameOver || choosing) return;
   paused = !paused;
   if (!paused) {
     lastTime = performance.now();
@@ -277,11 +424,15 @@ function togglePause() {
 }
 
 function loop(ts) {
-  if (gameOver || paused) return;
+  if (gameOver || paused || choosing) return;
   const dt = ts - lastTime;
   lastTime = ts;
   dropAccum += dt;
-  if (dropAccum >= dropInterval) {
+  if (slowLeft > 0) {
+    slowLeft = Math.max(0, slowLeft - dt);
+    updateEffects();
+  }
+  if (dropAccum >= dropInterval * (slowLeft > 0 ? SLOW_FACTOR : 1)) {
     dropAccum = 0;
     if (!collide(current.shape, current.x, current.y + 1)) {
       current.y++;
@@ -306,7 +457,18 @@ function init() {
   dropInterval = 1000;
   dropAccum = 0;
   lastTime = performance.now();
-  next = randomPiece();
+  energy = 0;
+  choosing = false;
+  previewLeft = 0;
+  slowLeft = 0;
+  holdLeft = 0;
+  held = null;
+  holdUsed = false;
+  undoSnapshot = null;
+  queue = [];
+  fillQueue();
+  abilityMenu.classList.add('hidden');
+  restartBtn.classList.remove('hidden');
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
@@ -317,9 +479,21 @@ function init() {
 document.addEventListener('keydown', e => {
   // El switch de tema usa Space/Enter nativamente; no debe disparar hard drop
   if (e.target === themeToggle && e.code !== 'KeyP') return;
+  if (choosing) {
+    const m = e.code.match(/^(?:Digit|Numpad)([1-5])$/);
+    if (m) useAbility(Number(m[1]));
+    else if (e.code === 'Escape') closeAbilityMenu();
+    return;
+  }
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
+    case 'KeyE':
+      openAbilityMenu();
+      return;
+    case 'KeyC':
+      holdSwap();
+      break;
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
       break;
@@ -342,6 +516,13 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+abilityMenu.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.dataset.cancel) closeAbilityMenu();
+  else useAbility(Number(btn.dataset.ability));
+});
 
 themeToggle.addEventListener('click', e => {
   const theme = themeToggle.getAttribute('aria-checked') === 'true' ? 'dark' : 'light';

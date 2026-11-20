@@ -20,6 +20,8 @@ Three files, all logic in `game.js` (loaded as a classic script, `'use strict'`,
 
 Flow: `loop` (rAF) accumulates `dropAccum`, steps the piece down every `dropInterval`, calls `draw()`. Piece landing goes `lockPiece` → `merge` → `clearLines` → `spawn`. `spawn` calls `endGame` if the new piece collides immediately. Pause and game over both cancel the rAF and reuse the same `#overlay`.
 
+Habilidades: `clearLines` suma energía (`cleared`, +1 extra con Tetris) hasta `ENERGY_MAX`. Con la barra llena, `E` abre `#ability-menu` dentro de `#overlay` (estado `choosing`, cancela el rAF; teclas 1–5 / clic eligen, Esc cancela; `P` se ignora). `useAbility` aplica la habilidad, vacía la energía y reanuda. La pieza siguiente es `queue[0]` (`queue` mantiene ≥5 piezas, reemplaza a `next`); `lockPiece` guarda `undoSnapshot` antes de `merge`. Efectos temporales: `previewLeft`/`holdLeft` (en piezas, se decrementan en `spawn`) y `slowLeft` (ms, se decrementa en `loop` y duplica `dropInterval`). `C` = hold (`holdSwap`, una vez por pieza). IDs extra en el DOM: `energy-fill`, `energy-hint`, `queue-canvas`, `hold-canvas`, `hold-section`, `hold-label`, `effects`, `effects-list`, `ability-menu`.
+
 Quirks to know:
 - `COLS`/`ROWS`/`BLOCK` must match the `<canvas id="board">` `width`/`height` in `index.html` (`COLS*BLOCK` x `ROWS*BLOCK`). The next-piece canvas assumes a 4x4 grid at 30px.
 - Level speed is set in `clearLines`: `max(100, 1000 - (level-1)*90)` ms. `init` hardcodes the initial 1000.

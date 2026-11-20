@@ -31,8 +31,25 @@
         </div>
 
         <div class="panel-section">
+          <span class="label">ENERGY</span>
+          <div class="energy-bar"><div id="energy-fill"></div></div>
+          <span class="hint" id="energy-hint">0/10</span>
+        </div>
+
+        <div class="panel-section">
           <span class="label">NEXT</span>
           <canvas id="next-canvas" width="120" height="120"></canvas>
+          <canvas id="queue-canvas" class="hidden" width="60" height="240"></canvas>
+        </div>
+
+        <div class="panel-section hidden" id="hold-section">
+          <span class="label" id="hold-label">HOLD</span>
+          <canvas id="hold-canvas" width="120" height="120"></canvas>
+        </div>
+
+        <div class="panel-section hidden" id="effects">
+          <span class="label">EFECTOS</span>
+          <div class="hint" id="effects-list"></div>
         </div>
 
         <div class="panel-section controls">
@@ -42,6 +59,8 @@
             <li><kbd>↑</kbd> rotar</li>
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
+            <li><kbd>E</kbd> habilidad</li>
+            <li><kbd>C</kbd> reservar</li>
             <li><kbd>P</kbd> pausa</li>
           </ul>
         </div>
@@ -52,6 +71,14 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <ul id="ability-menu" class="hidden">
+          <li><button type="button" data-ability="1"><kbd>1</kbd> Ver siguientes 5 piezas</button></li>
+          <li><button type="button" data-ability="2"><kbd>2</kbd> Intercambiar pieza actual</button></li>
+          <li><button type="button" data-ability="3"><kbd>3</kbd> Ralentizar tiempo 10s</button></li>
+          <li><button type="button" data-ability="4"><kbd>4</kbd> Deshacer última colocación</button></li>
+          <li><button type="button" data-ability="5"><kbd>5</kbd> Reservar pieza (hold)</button></li>
+          <li><button type="button" data-cancel="1">Cancelar (Esc)</button></li>
+        </ul>
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>

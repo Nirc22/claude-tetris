@@ -119,6 +119,80 @@ body {
   border-radius: 4px;
 }
 
+.hidden {
+  display: none !important;
+}
+
+#queue-canvas,
+#hold-canvas {
+  display: block;
+  border: 1px solid var(--border);
+  background: var(--canvas-bg);
+  border-radius: 4px;
+}
+
+/* ---- Energía y efectos ---- */
+.energy-bar {
+  height: 12px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#energy-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+
+#energy-fill.full {
+  animation: energy-pulse 1s ease-in-out infinite;
+}
+
+@keyframes energy-pulse {
+  50% { opacity: 0.55; }
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+/* ---- Menú de habilidades ---- */
+#ability-menu {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#ability-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#ability-menu button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+#ability-menu button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
