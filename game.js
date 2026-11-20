@@ -638,6 +638,9 @@ skinSelect.addEventListener('change', () => {
   applySkin(skinSelect.value);
   skinSelect.blur(); // devolver el teclado al juego
 });
+// Cerrar el desplegable sin cambiar (Esc o clic fuera) también devuelve el teclado al juego
+skinSelect.addEventListener('close', () => skinSelect.blur());
+skinSelect.addEventListener('keydown', e => { if (e.code === 'Escape') skinSelect.blur(); });
 
 let savedSkin = 'retro';
 try { savedSkin = localStorage.getItem('skin') || 'retro'; } catch (_) {}
