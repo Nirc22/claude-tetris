@@ -66,6 +66,17 @@ const holdLabel = document.getElementById('hold-label');
 const effectsSection = document.getElementById('effects');
 const effectsList = document.getElementById('effects-list');
 const abilityMenu = document.getElementById('ability-menu');
+const nameEntry = document.getElementById('name-entry');
+const nameInput = document.getElementById('name-input');
+const saveNameBtn = document.getElementById('save-name-btn');
+const recordsBox = document.getElementById('records');
+const recordsList = document.getElementById('records-list');
+const recordsExtra = document.getElementById('records-extra');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+
+const MAX_RECORDS = 5;
+const RECORDS_KEY = 'records';
+const STATS_KEY = 'recordStats';
 
 const ENERGY_MAX = 10;
 const SLOW_MS = 10000;
@@ -86,6 +97,9 @@ function applyTheme(theme) {
 let board, current, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let queue = [];
 let energy = 0, choosing = false;
+let started = false;
+let combo = 0, comboMax = 0;
+let pendingRecord = false, savedIdx = -1;
 let previewLeft = 0, slowLeft = 0, holdLeft = 0, held = null, holdUsed = false, undoSnapshot = null;
 
 function createBoard() {
@@ -156,6 +170,8 @@ function clearLines() {
       r++;
     }
   }
+  combo = cleared ? combo + 1 : 0;
+  if (combo > comboMax) comboMax = combo;
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
@@ -197,7 +213,7 @@ function lockPiece() {
     type: current.type,
     queue: [...queue],
     score, lines, level, dropInterval,
-    previewLeft, holdLeft, held, holdUsed,
+    previewLeft, holdLeft, held, holdUsed, combo,
   };
   merge();
   clearLines();
@@ -382,7 +398,7 @@ function useAbility(n) {
       break;
     case 4:
       if (!undoSnapshot) return;
-      ({ score, lines, level, dropInterval, previewLeft, holdLeft, held, holdUsed } = undoSnapshot);
+      ({ score, lines, level, dropInterval, previewLeft, holdLeft, held, holdUsed, combo } = undoSnapshot);
       board = undoSnapshot.board;
       queue = undoSnapshot.queue;
       current = makePiece(undoSnapshot.type);
@@ -401,11 +417,142 @@ function useAbility(n) {
   closeAbilityMenu();
 }
 
+// ---- Records (localStorage) ----
+function loadRecords() {
+  try {
+    const data = JSON.parse(localStorage.getItem(RECORDS_KEY));
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter(r => r && typeof r === 'object' && typeof r.name === 'string' && Number.isFinite(r.score) && r.score > 0)
+      .map(r => ({
+        name: r.name.slice(0, 12),
+        score: Math.floor(r.score),
+        lines: Number.isFinite(r.lines) ? Math.floor(r.lines) : 0,
+        level: Number.isFinite(r.level) ? Math.floor(r.level) : 1,
+        date: typeof r.date === 'string' ? r.date.slice(0, 10) : '',
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_RECORDS);
+  } catch (_) { return []; }
+}
+
+function saveRecords(list) {
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(list)); } catch (_) {}
+}
+
+function loadStats() {
+  const stats = { bestCombo: 0, maxLines: 0 };
+  try {
+    const data = JSON.parse(localStorage.getItem(STATS_KEY));
+    if (data && typeof data === 'object') {
+      if (Number.isFinite(data.bestCombo) && data.bestCombo > 0) stats.bestCombo = Math.floor(data.bestCombo);
+      if (Number.isFinite(data.maxLines) && data.maxLines > 0) stats.maxLines = Math.floor(data.maxLines);
+    }
+  } catch (_) {}
+  return stats;
+}
+
+function saveStats(stats) {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (_) {}
+}
+
+// Posición que ocuparía una puntuación (tras las iguales), o -1 si no entra
+function rankFor(list, s) {
+  if (s <= 0) return -1;
+  let idx = list.findIndex(r => r.score < s);
+  if (idx === -1) idx = list.length;
+  return idx < MAX_RECORDS ? idx : -1;
+}
+
+function renderRecords() {
+  const list = loadRecords();
+  let rows = list;
+  let hi = savedIdx;
+  if (pendingRecord) {
+    hi = rankFor(list, score);
+    if (hi >= 0) {
+      rows = list.slice();
+      rows.splice(hi, 0, { name: '(tú)', score });
+      rows = rows.slice(0, MAX_RECORDS);
+    }
+  }
+  recordsList.textContent = '';
+  if (!rows.length) {
+    const li = document.createElement('li');
+    li.textContent = 'Sin records todavía';
+    recordsList.appendChild(li);
+  }
+  rows.forEach((r, i) => {
+    const li = document.createElement('li');
+    if (i === hi) li.className = 'me';
+    const rank = document.createElement('span');
+    rank.textContent = `${i + 1}.`;
+    const name = document.createElement('span');
+    name.className = 'rec-name';
+    name.textContent = r.name;
+    const sc = document.createElement('span');
+    sc.className = 'rec-score';
+    sc.textContent = r.score.toLocaleString();
+    li.append(rank, name, sc);
+    recordsList.appendChild(li);
+  });
+  const stats = loadStats();
+  recordsExtra.textContent = `Mejor combo: ${stats.bestCombo} · Líneas máx.: ${stats.maxLines}`;
+}
+
+function submitName() {
+  if (!pendingRecord) return;
+  const list = loadRecords();
+  const idx = rankFor(list, score);
+  pendingRecord = false;
+  nameEntry.classList.add('hidden');
+  if (idx >= 0) {
+    list.splice(idx, 0, {
+      name: nameInput.value.trim().slice(0, 12) || 'Anónimo',
+      score, lines, level,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    list.length = Math.min(list.length, MAX_RECORDS);
+    saveRecords(list);
+    savedIdx = idx;
+  }
+  renderRecords();
+  nameInput.blur();
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+
+  const stats = loadStats();
+  stats.bestCombo = Math.max(stats.bestCombo, comboMax);
+  stats.maxLines = Math.max(stats.maxLines, lines);
+  saveStats(stats);
+
+  savedIdx = -1;
+  pendingRecord = rankFor(loadRecords(), score) >= 0;
+  renderRecords();
+  recordsBox.classList.remove('hidden');
+  nameEntry.classList.toggle('hidden', !pendingRecord);
+  overlay.classList.remove('hidden');
+  if (pendingRecord) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+}
+
+function showStart() {
+  init();
+  cancelAnimationFrame(animId);
+  started = false;
+  draw();
+  overlayTitle.textContent = 'TETRIS';
+  overlayScore.textContent = '';
+  restartBtn.textContent = 'Jugar';
+  renderRecords();
+  recordsBox.classList.remove('hidden');
   overlay.classList.remove('hidden');
 }
 
@@ -448,6 +595,14 @@ function loop(ts) {
 }
 
 function init() {
+  started = true;
+  combo = 0;
+  comboMax = 0;
+  pendingRecord = false;
+  savedIdx = -1;
+  nameEntry.classList.add('hidden');
+  recordsBox.classList.add('hidden');
+  restartBtn.textContent = 'Reiniciar';
   board = createBoard();
   score = 0;
   lines = 0;
@@ -479,6 +634,13 @@ function init() {
 document.addEventListener('keydown', e => {
   // El switch de tema usa Space/Enter nativamente; no debe disparar hard drop
   if (e.target === themeToggle && e.code !== 'KeyP') return;
+  // El campo de nombre captura todas las teclas (el Enter lo gestiona su propio handler)
+  if (e.target === nameInput) return;
+  // Pantalla de inicio: solo Enter (si no hay un botón enfocado) arranca
+  if (!started) {
+    if (e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) init();
+    return;
+  }
   if (choosing) {
     const m = e.code.match(/^(?:Digit|Numpad)([1-5])$/);
     if (m) useAbility(Number(m[1]));
@@ -515,7 +677,18 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+restartBtn.addEventListener('click', () => { if (pendingRecord) submitName(); init(); });
+
+saveNameBtn.addEventListener('click', submitName);
+nameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter') { e.preventDefault(); submitName(); }
+});
+resetRecordsBtn.addEventListener('click', () => {
+  if (!confirm('¿Borrar todos los records?')) return;
+  try { localStorage.removeItem(RECORDS_KEY); localStorage.removeItem(STATS_KEY); } catch (_) {}
+  savedIdx = -1;
+  renderRecords();
+});
 
 abilityMenu.addEventListener('click', e => {
   const btn = e.target.closest('button');
@@ -535,4 +708,4 @@ let savedTheme = 'dark';
 try { savedTheme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark'; } catch (_) {}
 applyTheme(savedTheme);
 
-init();
+showStart();
