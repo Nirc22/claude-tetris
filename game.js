@@ -13,6 +13,11 @@ const COLORS = [
   '#e57373', // Z - red
   '#90caf9', // J - pale blue
   '#ffb74d', // L - orange
+  '#f06292', // + - pink
+  '#4db6ac', // U - teal
+  '#a1887f', // Y - brown
+  '#fff176', // single - light yellow
+  '#9575cd', // hollow 3x3 - violet
 ];
 
 const PIECES = [
@@ -24,7 +29,17 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[0,8,0],[8,8,8],[0,8,0]],                  // + (pentominó)
+  [[9,0,9],[9,9,9],[0,0,0]],                  // U (pentominó)
+  [[0,0,0,0],[10,10,10,10],[0,10,0,0],[0,0,0,0]], // Y (pentominó)
+  [[11]],                                      // single 1x1 (recompensa)
+  [[12,12,12],[12,0,12],[12,12,12]],          // 3x3 hueca (reto)
 ];
+
+const STANDARD_TYPES = 7;
+const SPECIAL_TYPES = [8, 9, 10, 12]; // piezas que aparecen ocasionalmente
+const SPECIAL_CHANCE = 0.12;
+const SINGLE_TYPE = 11;
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -58,8 +73,15 @@ function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
 
+function makePiece(type) {
+  const shape = PIECES[type].map(row => [...row]);
+  return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
 function randomPiece() {
-  const type = Math.floor(Math.random() * 7) + 1;
+  if (Math.random() < SPECIAL_CHANCE)
+    return makePiece(SPECIAL_TYPES[Math.floor(Math.random() * SPECIAL_TYPES.length)]);
+  const type = Math.floor(Math.random() * STANDARD_TYPES) + 1;
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
@@ -120,6 +142,8 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    // Recompensa tras un Tetris: la siguiente pieza es un 1x1
+    if (cleared >= 4) next = makePiece(SINGLE_TYPE);
     updateHUD();
   }
 }
