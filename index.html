@@ -79,6 +79,19 @@
           <li><button type="button" data-ability="5"><kbd>5</kbd> Reservar pieza (hold)</button></li>
           <li><button type="button" data-cancel="1">Cancelar (Esc)</button></li>
         </ul>
+        <div id="name-entry" class="hidden">
+          <label for="name-input">¡Entras en el top 5! Tu nombre:</label>
+          <div class="name-row">
+            <input id="name-input" type="text" maxlength="12" autocomplete="off" />
+            <button id="save-name-btn" type="button">Guardar</button>
+          </div>
+        </div>
+        <div id="records" class="hidden">
+          <span class="label">TOP 5</span>
+          <ol id="records-list"></ol>
+          <p id="records-extra"></p>
+          <button id="reset-records-btn" type="button">Borrar records</button>
+        </div>
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>
