@@ -162,14 +162,16 @@ body {
 }
 
 /* ---- Menú de habilidades ---- */
-#ability-menu {
+#ability-menu,
+#pause-main {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-#ability-menu button {
+#ability-menu button,
+#pause-menu button {
   width: 100%;
   display: flex;
   align-items: center;
@@ -184,13 +186,63 @@ body {
   cursor: pointer;
 }
 
-#ability-menu button:hover:not(:disabled) {
+#ability-menu button:hover:not(:disabled),
+#pause-menu button:hover {
   border-color: var(--accent);
 }
 
 #ability-menu button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ---- Menú de pausa ---- */
+#pause-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+#pause-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+#pause-controls ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#pause-controls li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pause-level {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pause-level select {
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
 }
 
 /* ---- Controles ---- */

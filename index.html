@@ -88,6 +88,34 @@
           <li><button type="button" data-ability="5"><kbd>5</kbd> Reservar pieza (hold)</button></li>
           <li><button type="button" data-cancel="1">Cancelar (Esc)</button></li>
         </ul>
+        <div id="pause-menu" class="hidden">
+          <ul id="pause-main">
+            <li><button type="button" data-pause="resume">Reanudar (Esc)</button></li>
+            <li><button type="button" data-pause="restart">Reiniciar</button></li>
+            <li><button type="button" data-pause="controls">Ver controles</button></li>
+            <li class="pause-level"><label for="start-level">Nivel inicial</label>
+              <select id="start-level">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                <option value="13">13</option><option value="14">14</option><option value="15">15</option>
+              </select>
+            </li>
+          </ul>
+          <div id="pause-controls" class="hidden">
+            <ul>
+              <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+              <li><kbd>↑</kbd> / <kbd>X</kbd> rotar</li>
+              <li><kbd>↓</kbd> bajar</li>
+              <li><kbd>Space</kbd> caída</li>
+              <li><kbd>E</kbd> habilidad</li>
+              <li><kbd>C</kbd> reservar</li>
+              <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
+            </ul>
+            <button type="button" data-pause="back">Volver</button>
+          </div>
+        </div>
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>
